@@ -38,7 +38,38 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         this.liveCount   = new AtomicInteger(0);
     }
 
-    @Override public void    put(K key, V value, long ttlMillis) { /* Phase 2 */ }
+    @Override
+    public void put(K key, V value, long ttlMillis) {
+        lockManager.acquireWriteLock();
+        try {
+            long expiryTime = (ttlMillis > 0) ? System.currentTimeMillis() + ttlMillis : 0;
+            DoublyLinkedListNode<K, V> existingNode = nodeMap.get(key);
+
+            if (existingNode != null) {
+                // Update in-place
+                existingNode.value = value;
+                existingNode.expiryTime = expiryTime;
+                lruStrategy.keyAccessed(key);
+                
+                if (expiryTime > 0) {
+                    ttlHeap.push(expiryTime, key);
+                }
+            } else {
+                evictIfAtCapacity();
+
+                DoublyLinkedListNode<K, V> newNode = new DoublyLinkedListNode<>(key, value, expiryTime);
+                nodeMap.put(key, newNode);
+                lruStrategy.keyAdded(key, newNode);
+                liveCount.incrementAndGet();
+
+                if (expiryTime > 0) {
+                    ttlHeap.push(expiryTime, key);
+                }
+            }
+        } finally {
+            lockManager.releaseWriteLock();
+        }
+    }
     @Override public V       get(K key)                          { return null;  }
     @Override public boolean remove(K key)                       { return false; }
     @Override public void    clear()                             { /* Phase 2 */ }
@@ -49,7 +80,13 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         return node.expiryTime > 0 && System.currentTimeMillis() > node.expiryTime;
     }
 
-    private void evictIfAtCapacity() { /* Phase 2 */ }
+    private void evictIfAtCapacity() {
+        while (liveCount.get() >= capacity) {
+            K victim = lruStrategy.evictNext();
+            nodeMap.remove(victim);
+            liveCount.decrementAndGet();
+        }
+    }
 
     public TtlHeap<K> getTtlHeap() { return ttlHeap; }
 }
