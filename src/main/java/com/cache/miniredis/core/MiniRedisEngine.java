@@ -110,7 +110,21 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             lockManager.releaseWriteLock();
         }
     }
-    @Override public boolean remove(K key)                       { return false; }
+    @Override
+    public boolean remove(K key) {
+        lockManager.acquireWriteLock();
+        try {
+            DoublyLinkedListNode<K, V> node = nodeMap.remove(key);
+            if (node != null) {
+                lruStrategy.keyRemoved(key);
+                liveCount.decrementAndGet();
+                return true;
+            }
+            return false;
+        } finally {
+            lockManager.releaseWriteLock();
+        }
+    }
     @Override public void    clear()                             { /* Phase 2 */ }
     @Override public int     size()                              { return liveCount.get(); }
 
