@@ -12,7 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Pure Java Test Harness for Mini-Redis.
+ * Test suite for MiniRedisEngine.
  */
 public class TestEngine {
 
@@ -45,15 +45,14 @@ public class TestEngine {
         LRUEvictionStrategy<String, String> lruStrategy = new LRUEvictionStrategy<>();
         MiniRedisEngine<String, String> engine = new MiniRedisEngine<>(5, lruStrategy, lockManager);
 
-        // Insert 5 items (capacity is 5)
+
         for (int i = 1; i <= 5; i++) {
             engine.put("key" + i, "val" + i, 0);
         }
 
-        // Access key1 to promote it to MRU
+
         engine.get("key1");
 
-        // Insert 6th item. Because key1 was accessed, key2 is now the LRU.
         engine.put("key6", "val6", 0);
 
         if (engine.size() != 5) {
@@ -85,7 +84,7 @@ public class TestEngine {
         TtlReaperService<String, String> reaper = new TtlReaperService<>(engine);
         reaper.start();
 
-        engine.put("tempKey", "tempValue", 300); // 300ms TTL
+        engine.put("tempKey", "tempValue", 300);
 
         if (engine.get("tempKey") == null) {
             System.out.println("FAIL (Key should exist immediately)");
@@ -93,7 +92,7 @@ public class TestEngine {
             return false;
         }
 
-        // Wait for TTL to expire and reaper to clean it up
+
         Thread.sleep(500);
 
         if (engine.size() != 0) {
@@ -127,7 +126,7 @@ public class TestEngine {
                 try {
                     ThreadLocalRandom rand = ThreadLocalRandom.current();
                     for (int j = 0; j < OPS_PER_THREAD; j++) {
-                        String key = "key" + rand.nextInt(200); // 200 possible keys
+                        String key = "key" + rand.nextInt(200);
                         int op = rand.nextInt(3);
                         if (op == 0) {
                             engine.put(key, "value", rand.nextBoolean() ? 50 : 0);
@@ -146,7 +145,7 @@ public class TestEngine {
             });
         }
 
-        latch.await(); // Wait for all threads to finish
+        latch.await();
         executor.shutdown();
 
         if (exceptions.get() > 0) {
