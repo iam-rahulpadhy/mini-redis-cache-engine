@@ -37,30 +37,23 @@ public class TtlReaperService<K, V> implements Runnable {
                 TtlHeap.TtlEntry<K> top = heap.peek();
                 
                 if (top == null) {
-                    // Heap is empty, wait a bit
                     Thread.sleep(100);
                     continue;
                 }
 
                 if (System.currentTimeMillis() >= top.expiryTime) {
-                    // It's expired! Pop it and reap it.
                     TtlHeap.TtlEntry<K> expiredEntry = heap.pop();
                     if (expiredEntry != null) {
                         engine.reapExpired(expiredEntry.key);
                     }
                 } else {
-                    // Top entry isn't expired yet.
-                    // Sleep a short time to avoid tight looping.
                     Thread.sleep(100);
                 }
             } catch (InterruptedException e) {
-                // Thread was interrupted during sleep, likely shutting down.
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                // Catch any unexpected exceptions to prevent the daemon from silently dying.
-                // In a real framework we'd log this, but pure Java we can just print to stderr.
-                System.err.println("TtlReaperService encountered an error: " + e.getMessage());
+                System.err.println("TtlReaperService error: " + e.getMessage());
             }
         }
     }

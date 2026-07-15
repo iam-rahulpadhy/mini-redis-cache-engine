@@ -4,7 +4,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * CacheLockManager - Centralised read-write lock authority for Mini-Redis.
+ * Centralised read-write lock authority for Mini-Redis.
  *
  * Wraps a single ReentrantReadWriteLock. fair=true prevents write-lock
  * starvation under heavy read load.

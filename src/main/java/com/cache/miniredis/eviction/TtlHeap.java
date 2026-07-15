@@ -3,11 +3,10 @@ package com.cache.miniredis.eviction;
 import java.util.PriorityQueue;
 
 /**
- * TtlHeap - Min-heap tracking (expiryTime, key) pairs for the TTL reaper.
+ * Min-heap tracking (expiryTime, key) pairs for the TTL reaper.
  *
- * Root is always the entry that expires soonest. The reaper peeks the root
- * and pops it if currentTimeMillis() has passed it.
- * NOT thread-safe - callers must hold the write lock.
+ * Root is always the entry that expires soonest. 
+ * Not thread-safe; relies on engine locks.
  */
 public class TtlHeap<K> {
 

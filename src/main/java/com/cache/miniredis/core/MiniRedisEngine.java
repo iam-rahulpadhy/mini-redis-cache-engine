@@ -10,12 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * MiniRedisEngine - Core cache engine. Phase 2 fills in put/get/remove/clear.
- *
- * Data structures:
- *   ConcurrentHashMap for O(1) key lookup
- *   LRUEvictionStrategy (doubly-linked list) for O(1) LRU eviction
- *   TtlHeap (min-heap) for the background TTL reaper (Phase 3)
+ * Core cache engine implementing thread-safe O(1) operations,
+ * strict LRU eviction, and background TTL reaping.
  */
 public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
 
@@ -84,12 +80,11 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             return null; // Fast path: cache miss
         }
 
-        // We have a node, but we must acquire the write lock because both 
-        // lazy expiry (removal) and LRU promotion (list update) mutate state.
+        // Read lock released. Acquire write lock since both lazy expiry 
+        // and LRU promotion mutate state.
         lockManager.acquireWriteLock();
         try {
-            // ABA prevention: re-fetch the node because it may have been 
-            // evicted by another thread while we were waiting for the write lock.
+            // Re-fetch to prevent ABA if another thread modified it
             node = nodeMap.get(key);
             if (node == null) {
                 return null;
@@ -140,7 +135,7 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
 
     /**
      * Called by the background reaper thread. Removes the key only if it is
-     * currently expired. Guards against stale TTL heap entries.
+     * currently expired, guarding against stale TTL heap entries.
      */
     public void reapExpired(K key) {
         lockManager.acquireWriteLock();
@@ -157,7 +152,7 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
     }
     @Override public int     size()                              { return liveCount.get(); }
 
-    // expiryTime == 0 means immortal. Only hit the clock when there is a TTL.
+    // expiryTime == 0 means immortal.
     boolean isExpired(DoublyLinkedListNode<K, V> node) {
         return node.expiryTime > 0 && System.currentTimeMillis() > node.expiryTime;
     }
