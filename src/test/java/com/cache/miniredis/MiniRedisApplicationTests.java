@@ -1,13 +1,6 @@
 package com.cache.miniredis;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-
-@SpringBootTest
-class MiniRedisApplicationTests {
-
-	@Test
-	void contextLoads() {
-	}
-
+/** Placeholder test class - real tests live in TestEngine.java (Phase 4). */
+public class MiniRedisApplicationTests {
+    // intentionally empty
 }
