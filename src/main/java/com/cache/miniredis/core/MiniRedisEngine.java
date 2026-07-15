@@ -3,21 +3,19 @@ package com.cache.miniredis.core;
 import com.cache.miniredis.concurrency.CacheLockManager;
 import com.cache.miniredis.eviction.DoublyLinkedListNode;
 import com.cache.miniredis.eviction.LRUEvictionStrategy;
-import com.cache.miniredis.eviction.TtlHeap;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Core cache engine implementing thread-safe O(1) operations,
- * strict LRU eviction, and background TTL reaping.
+ * Core cache engine implementing thread-safe O(1) operations
+ * and strict LRU eviction.
  */
 public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
 
     private final ConcurrentHashMap<K, DoublyLinkedListNode<K, V>> nodeMap;
     private final LRUEvictionStrategy<K, V> lruStrategy;
     private final CacheLockManager          lockManager;
-    private final TtlHeap<K>                ttlHeap;
     private final int                       capacity;
     private final AtomicInteger             liveCount;
 
@@ -29,7 +27,6 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         this.lruStrategy = lruStrategy;
         this.lockManager = lockManager;
         this.nodeMap     = new ConcurrentHashMap<>(capacity);
-        this.ttlHeap     = new TtlHeap<>();
         this.liveCount   = new AtomicInteger(0);
     }
 
@@ -50,10 +47,6 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
                 nodeMap.put(key, node);
                 lruStrategy.keyAdded(key, node);
                 liveCount.incrementAndGet();
-            }
-
-            if (expiryTime > 0) {
-                ttlHeap.push(expiryTime, key);
             }
         } finally {
             lockManager.releaseWriteLock();
@@ -119,30 +112,13 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         try {
             lruStrategy.clear();
             nodeMap.clear();
-            ttlHeap.clear();
             liveCount.set(0);
         } finally {
             lockManager.releaseWriteLock();
         }
     }
 
-    /**
-     * Called by the background reaper thread. Removes the key only if it is
-     * currently expired, guarding against stale TTL heap entries.
-     */
-    public void reapExpired(K key) {
-        lockManager.acquireWriteLock();
-        try {
-            DoublyLinkedListNode<K, V> node = nodeMap.get(key);
-            if (node != null && isExpired(node)) {
-                nodeMap.remove(key);
-                lruStrategy.keyRemoved(key);
-                liveCount.decrementAndGet();
-            }
-        } finally {
-            lockManager.releaseWriteLock();
-        }
-    }
+
     @Override public int     size()                              { return liveCount.get(); }
 
     // expiryTime == 0 means immortal.
@@ -158,5 +134,4 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         }
     }
 
-    public TtlHeap<K> getTtlHeap() { return ttlHeap; }
 }

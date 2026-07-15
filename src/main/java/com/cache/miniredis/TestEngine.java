@@ -3,7 +3,7 @@ package com.cache.miniredis;
 import com.cache.miniredis.concurrency.CacheLockManager;
 import com.cache.miniredis.core.MiniRedisEngine;
 import com.cache.miniredis.eviction.LRUEvictionStrategy;
-import com.cache.miniredis.eviction.TtlReaperService;
+import com.cache.miniredis.core.TenantRegistry;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -22,18 +22,18 @@ public class TestEngine {
         System.out.println("==================================================\n");
 
         boolean lruPassed = testLruAccuracy();
-        boolean ttlPassed = testTtlReaper();
+        boolean tenantPassed = testTenantIsolation();
         boolean concurrencyPassed = testConcurrencyStress();
 
         System.out.println("\n==================================================");
         System.out.println("                   TEST SUMMARY                   ");
         System.out.println("==================================================");
         System.out.println("LRU Eviction Accuracy:   " + (lruPassed ? "✅ PASS" : "❌ FAIL"));
-        System.out.println("TTL Background Reaper:   " + (ttlPassed ? "✅ PASS" : "❌ FAIL"));
+        System.out.println("Tenant Isolation Test:   " + (tenantPassed ? "✅ PASS" : "❌ FAIL"));
         System.out.println("Concurrency Stress Test: " + (concurrencyPassed ? "✅ PASS" : "❌ FAIL"));
         System.out.println("==================================================");
 
-        if (!lruPassed || !ttlPassed || !concurrencyPassed) {
+        if (!lruPassed || !tenantPassed || !concurrencyPassed) {
             System.exit(1);
         }
     }
@@ -74,34 +74,28 @@ public class TestEngine {
         return true;
     }
 
-    private static boolean testTtlReaper() throws InterruptedException {
-        System.out.print("[TEST] TTL Background Reaper... ");
+    private static boolean testTenantIsolation() {
+        System.out.print("[TEST] Multi-Tenant Namespace Isolation... ");
 
-        CacheLockManager lockManager = new CacheLockManager();
-        LRUEvictionStrategy<String, String> lruStrategy = new LRUEvictionStrategy<>();
-        MiniRedisEngine<String, String> engine = new MiniRedisEngine<>(10, lruStrategy, lockManager);
+        TenantRegistry<String, String> registry = new TenantRegistry<>(10);
         
-        TtlReaperService<String, String> reaper = new TtlReaperService<>(engine);
-        reaper.start();
+        MiniRedisEngine<String, String> tenantA = registry.getCache("tenantA");
+        MiniRedisEngine<String, String> tenantB = registry.getCache("tenantB");
 
-        engine.put("tempKey", "tempValue", 300);
+        tenantA.put("key1", "valueA", 0);
+        tenantB.put("key1", "valueB", 0);
 
-        if (engine.get("tempKey") == null) {
-            System.out.println("FAIL (Key should exist immediately)");
-            reaper.shutdown();
+        if (!"valueA".equals(tenantA.get("key1")) || !"valueB".equals(tenantB.get("key1"))) {
+            System.out.println("FAIL (Namespaces are leaking data)");
             return false;
         }
 
-
-        Thread.sleep(500);
-
-        if (engine.size() != 0) {
-            System.out.println("FAIL (Reaper did not clear the expired key, size=" + engine.size() + ")");
-            reaper.shutdown();
+        registry.dropCache("tenantA");
+        if (registry.getNamespaceCount() != 1) {
+            System.out.println("FAIL (Namespace was not dropped)");
             return false;
         }
 
-        reaper.shutdown();
         System.out.println("✅ PASS");
         return true;
     }

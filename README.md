@@ -7,7 +7,8 @@ A pure Java, zero-dependency in-memory caching engine. Designed for high concurr
 - **Pure Java**: No Spring, no Maven, no external dependencies.
 - **Thread-Safe**: Uses `ReentrantReadWriteLock` for high-throughput concurrent reads and safe writes.
 - **O(1) LRU Eviction**: Custom doubly-linked list and `ConcurrentHashMap` guarantee constant time operations.
-- **Lazy & Background TTL**: Keys expire lazily on access, and a background daemon (`TtlReaperService`) uses a Min-Heap to aggressively reap expired keys and prevent memory leaks.
+- **Multi-Tenant Isolation**: Features a `TenantRegistry` that manages completely isolated cache instances (namespaces) inside a single JVM.
+- **Lazy TTL**: Keys expire lazily on access, naturally preventing memory leaks without the overhead of background threads.
 
 ## Architecture & Workflow
 
@@ -21,13 +22,12 @@ src/main/java/com/cache/miniredis/
 ├── concurrency/
 │   └── CacheLockManager.java      # Centralized read/write lock
 ├── core/
+    ├── TenantRegistry.java        # Multi-tenant namespace isolation
 │   ├── CacheManager.java          # Core interface
 │   └── MiniRedisEngine.java       # Primary cache implementation
 ├── eviction/
 │   ├── DoublyLinkedListNode.java  # Node for LRU tracking
-│   ├── LRUEvictionStrategy.java   # O(1) list manipulation
-│   ├── TtlHeap.java               # Min-Heap for TTL deadlines
-│   └── TtlReaperService.java      # Background cleanup daemon
+│   └── LRUEvictionStrategy.java   # O(1) list manipulation
 ├── MiniRedisApplication.java      # Entry point
 └── TestEngine.java                # Multi-threaded test harness
 ```
