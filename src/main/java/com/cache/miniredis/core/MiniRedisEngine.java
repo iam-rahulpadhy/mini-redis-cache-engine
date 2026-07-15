@@ -70,7 +70,46 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             lockManager.releaseWriteLock();
         }
     }
-    @Override public V       get(K key)                          { return null;  }
+    @Override
+    public V get(K key) {
+        lockManager.acquireReadLock();
+        DoublyLinkedListNode<K, V> node;
+        try {
+            node = nodeMap.get(key);
+        } finally {
+            lockManager.releaseReadLock();
+        }
+
+        if (node == null) {
+            return null; // Fast path: cache miss
+        }
+
+        // We have a node, but we must acquire the write lock because both 
+        // lazy expiry (removal) and LRU promotion (list update) mutate state.
+        lockManager.acquireWriteLock();
+        try {
+            // ABA prevention: re-fetch the node because it may have been 
+            // evicted by another thread while we were waiting for the write lock.
+            node = nodeMap.get(key);
+            if (node == null) {
+                return null;
+            }
+
+            if (isExpired(node)) {
+                // Lazy expiry cleanup
+                nodeMap.remove(key);
+                lruStrategy.keyRemoved(key);
+                liveCount.decrementAndGet();
+                return null;
+            }
+
+            // Valid cache hit: promote to MRU and return
+            lruStrategy.keyAccessed(key);
+            return node.value;
+        } finally {
+            lockManager.releaseWriteLock();
+        }
+    }
     @Override public boolean remove(K key)                       { return false; }
     @Override public void    clear()                             { /* Phase 2 */ }
     @Override public int     size()                              { return liveCount.get(); }
