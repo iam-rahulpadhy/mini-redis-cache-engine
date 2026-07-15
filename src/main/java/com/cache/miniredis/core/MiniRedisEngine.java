@@ -2,7 +2,6 @@ package com.cache.miniredis.core;
 
 import com.cache.miniredis.concurrency.CacheLockManager;
 import com.cache.miniredis.eviction.DoublyLinkedListNode;
-import com.cache.miniredis.eviction.EvictionPolicy;
 import com.cache.miniredis.eviction.LRUEvictionStrategy;
 import com.cache.miniredis.eviction.TtlHeap;
 
@@ -39,28 +38,22 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         lockManager.acquireWriteLock();
         try {
             long expiryTime = (ttlMillis > 0) ? System.currentTimeMillis() + ttlMillis : 0;
-            DoublyLinkedListNode<K, V> existingNode = nodeMap.get(key);
+            DoublyLinkedListNode<K, V> node = nodeMap.get(key);
 
-            if (existingNode != null) {
-                // Update in-place
-                existingNode.value = value;
-                existingNode.expiryTime = expiryTime;
+            if (node != null) {
+                node.value = value;
+                node.expiryTime = expiryTime;
                 lruStrategy.keyAccessed(key);
-                
-                if (expiryTime > 0) {
-                    ttlHeap.push(expiryTime, key);
-                }
             } else {
                 evictIfAtCapacity();
-
-                DoublyLinkedListNode<K, V> newNode = new DoublyLinkedListNode<>(key, value, expiryTime);
-                nodeMap.put(key, newNode);
-                lruStrategy.keyAdded(key, newNode);
+                node = new DoublyLinkedListNode<>(key, value, expiryTime);
+                nodeMap.put(key, node);
+                lruStrategy.keyAdded(key, node);
                 liveCount.incrementAndGet();
+            }
 
-                if (expiryTime > 0) {
-                    ttlHeap.push(expiryTime, key);
-                }
+            if (expiryTime > 0) {
+                ttlHeap.push(expiryTime, key);
             }
         } finally {
             lockManager.releaseWriteLock();

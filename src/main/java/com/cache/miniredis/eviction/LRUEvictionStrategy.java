@@ -8,7 +8,7 @@ import java.util.NoSuchElementException;
  * Standard LRU implementation using a doubly-linked list and HashMap.
  * Not thread-safe; relies on engine locks.
  */
-public class LRUEvictionStrategy<K, V> implements EvictionPolicy<K> {
+public class LRUEvictionStrategy<K, V> {
 
     private final DoublyLinkedListNode<K, V> head;
     private final DoublyLinkedListNode<K, V> tail;
@@ -22,7 +22,6 @@ public class LRUEvictionStrategy<K, V> implements EvictionPolicy<K> {
         this.nodeIndex = new HashMap<>();
     }
 
-    @Override
     public void keyAccessed(K key) {
         DoublyLinkedListNode<K, V> node = nodeIndex.get(key);
         if (node == null) return;
@@ -31,17 +30,11 @@ public class LRUEvictionStrategy<K, V> implements EvictionPolicy<K> {
         insertAfterHead(node);
     }
 
-    @Override
-    public void keyAdded(K key) {
-        throw new UnsupportedOperationException("Use keyAdded(K, DoublyLinkedListNode) instead");
-    }
-
     public void keyAdded(K key, DoublyLinkedListNode<K, V> node) {
         insertAfterHead(node);
         nodeIndex.put(key, node);
     }
 
-    @Override
     public K evictNext() {
         DoublyLinkedListNode<K, V> lru = tail.prev;
         if (lru == head) {
