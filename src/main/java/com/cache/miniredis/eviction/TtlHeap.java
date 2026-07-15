@@ -38,4 +38,5 @@ public class TtlHeap<K> {
     public TtlEntry<K> pop()     { return heap.poll();    }
     public int         size()    { return heap.size();    }
     public boolean     isEmpty() { return heap.isEmpty(); }
+    public void        clear()   { heap.clear(); }
 }

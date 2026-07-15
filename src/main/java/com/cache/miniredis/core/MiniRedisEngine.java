@@ -125,7 +125,18 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             lockManager.releaseWriteLock();
         }
     }
-    @Override public void    clear()                             { /* Phase 2 */ }
+    @Override
+    public void clear() {
+        lockManager.acquireWriteLock();
+        try {
+            lruStrategy.clear();
+            nodeMap.clear();
+            ttlHeap.clear();
+            liveCount.set(0);
+        } finally {
+            lockManager.releaseWriteLock();
+        }
+    }
     @Override public int     size()                              { return liveCount.get(); }
 
     // expiryTime == 0 means immortal. Only hit the clock when there is a TTL.
