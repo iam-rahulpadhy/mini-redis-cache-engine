@@ -137,6 +137,24 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             lockManager.releaseWriteLock();
         }
     }
+
+    /**
+     * Called by the background reaper thread. Removes the key only if it is
+     * currently expired. Guards against stale TTL heap entries.
+     */
+    public void reapExpired(K key) {
+        lockManager.acquireWriteLock();
+        try {
+            DoublyLinkedListNode<K, V> node = nodeMap.get(key);
+            if (node != null && isExpired(node)) {
+                nodeMap.remove(key);
+                lruStrategy.keyRemoved(key);
+                liveCount.decrementAndGet();
+            }
+        } finally {
+            lockManager.releaseWriteLock();
+        }
+    }
     @Override public int     size()                              { return liveCount.get(); }
 
     // expiryTime == 0 means immortal. Only hit the clock when there is a TTL.
