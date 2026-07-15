@@ -115,6 +115,8 @@ public class TestEngine {
         CountDownLatch latch = new CountDownLatch(THREADS);
         AtomicInteger exceptions = new AtomicInteger(0);
 
+        long startNanos = System.nanoTime();
+
         for (int i = 0; i < THREADS; i++) {
             executor.submit(() -> {
                 try {
@@ -152,7 +154,12 @@ public class TestEngine {
             return false;
         }
 
-        System.out.println("✅ PASS (Final Size: " + engine.size() + ")");
+        long endNanos = System.nanoTime();
+        long totalOps = THREADS * OPS_PER_THREAD;
+        double totalTimeMs = (endNanos - startNanos) / 1_000_000.0;
+        double avgLatencyMs = totalTimeMs / totalOps;
+
+        System.out.printf("✅ PASS (Final Size: %d) | Avg Latency: %.5f ms per op\n", engine.size(), avgLatencyMs);
         return true;
     }
 }
