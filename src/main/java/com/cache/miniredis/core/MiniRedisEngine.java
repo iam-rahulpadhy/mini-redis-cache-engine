@@ -40,18 +40,19 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             if (node != null) {
                 node.value = value;
                 node.expiryTime = expiryTime;
-                lruStrategy.keyAccessed(key);
+                lruStrategy.nodeAccessed(node);
             } else {
                 evictIfAtCapacity();
                 node = new DoublyLinkedListNode<>(key, value, expiryTime);
                 nodeMap.put(key, node);
-                lruStrategy.keyAdded(key, node);
+                lruStrategy.nodeAdded(node);
                 liveCount.incrementAndGet();
             }
         } finally {
             lockManager.releaseWriteLock();
         }
     }
+
     @Override
     public V get(K key) {
         lockManager.acquireReadLock();
@@ -79,25 +80,26 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             if (isExpired(node)) {
                 // Lazy expiry cleanup
                 nodeMap.remove(key);
-                lruStrategy.keyRemoved(key);
+                lruStrategy.nodeRemoved(node);
                 liveCount.decrementAndGet();
                 return null;
             }
 
             // Valid cache hit: promote to MRU and return
-            lruStrategy.keyAccessed(key);
+            lruStrategy.nodeAccessed(node);
             return node.value;
         } finally {
             lockManager.releaseWriteLock();
         }
     }
+
     @Override
     public boolean remove(K key) {
         lockManager.acquireWriteLock();
         try {
             DoublyLinkedListNode<K, V> node = nodeMap.remove(key);
             if (node != null) {
-                lruStrategy.keyRemoved(key);
+                lruStrategy.nodeRemoved(node);
                 liveCount.decrementAndGet();
                 return true;
             }
@@ -106,6 +108,7 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
             lockManager.releaseWriteLock();
         }
     }
+
     @Override
     public void clear() {
         lockManager.acquireWriteLock();
@@ -118,8 +121,7 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
         }
     }
 
-
-    @Override public int     size()                              { return liveCount.get(); }
+    @Override public int size() { return liveCount.get(); }
 
     // expiryTime == 0 means immortal.
     boolean isExpired(DoublyLinkedListNode<K, V> node) {
@@ -128,8 +130,8 @@ public class MiniRedisEngine<K, V> implements CacheManager<K, V> {
 
     private void evictIfAtCapacity() {
         while (liveCount.get() >= capacity) {
-            K victim = lruStrategy.evictNext();
-            nodeMap.remove(victim);
+            DoublyLinkedListNode<K, V> victim = lruStrategy.evictNext();
+            nodeMap.remove(victim.key);
             liveCount.decrementAndGet();
         }
     }
